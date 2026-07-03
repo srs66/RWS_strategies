@@ -1,18 +1,16 @@
 // 机枪机甲风筝 — 影子级响应 + 预判走位
 var GH = Packages.cn.tesseract.union.util.GameHelper;
-var NH = Packages.cn.tesseract.union.util.NetHelper;
 var UC = Packages.com.corrodinggames.rts.strategy.game.units.class_426;
 
 var UNIT_NAME = "mechMinigun";
 var MAX_RANGE = 210;
 var TICK_GAP = 1;
-var ENGAGE_MARGIN = 3;       // 接敌余量：目标距离 = 射程 - 余量，确保不超出
-var SHADOW_TOLERANCE = 0;    // 影子容忍度：偏差超过此值才发移动指令
-var LOOKAHEAD_BASE = 35;     // 基础预判 tick 数
-var LOOKAHEAD_SPEED = 20;    // 预判速度系数
+var ENGAGE_MARGIN = 3;
+var SHADOW_TOLERANCE = 0;
+var LOOKAHEAD_BASE = 35;
+var LOOKAHEAD_SPEED = 20;
 
-// JS 层追踪表（key = unit.hashCode()），避免 expando 属性不可靠
-var track = {};  // hash -> { px, py, pt, vx, vy, prevDist, prevEnemyHash }
+var track = {};
 
 function dist(ax, ay, bx, by) {
     var dx = ax - bx, dy = ay - by;
@@ -27,15 +25,7 @@ function unitHash(u) {
     try { return u.hashCode(); } catch (e) { return 0; }
 }
 
-function show(msg) {
-    try { GH.toast(msg); } catch (e) {}
-    try { NH.broadcastMessage("[kite] " + msg); } catch (e) {}
-}
-
 var n = 0;
-var errCount = 0;
-var moveCount = 0;
-var started = false;
 
 function onTick(tick) {
     n++;
@@ -65,14 +55,9 @@ function onTick(tick) {
             }
         }
 
-        if (!started) {
-            started = true;
-            show("v7: mech=" + mechs.length + " enemy=" + enemies.length);
-        }
-
         if (mechs.length === 0 || enemies.length === 0) return;
 
-        // ---- 更新所有单位速度（存入 JS track 表） ----
+        // 更新敌人速度
         for (var k = 0; k < enemies.length; k++) {
             var en = enemies[k];
             var h = unitHash(en);
@@ -92,6 +77,7 @@ function onTick(tick) {
             t.pt = tick;
         }
 
+        // 更新我方机甲速度
         for (var j = 0; j < mechs.length; j++) {
             var m = mechs[j];
             var h = unitHash(m);
@@ -111,14 +97,13 @@ function onTick(tick) {
             t.pt = tick;
         }
 
-        // ---- 逐机甲决策 ----
+        // 逐机甲决策
         for (var j = 0; j < mechs.length; j++) {
             var m = mechs[j];
             var mh = unitHash(m);
             var mt = track[mh];
             var mx = m.field_4227, my = m.field_4228;
 
-            // 找最近敌人
             var best = null, bestD = Infinity, bestH = -1;
             for (var k = 0; k < enemies.length; k++) {
                 var en = enemies[k];
@@ -133,15 +118,12 @@ function onTick(tick) {
             var mvx = mt ? (mt.vx || 0) : 0;
             var mvy = mt ? (mt.vy || 0) : 0;
 
-            // ---- 紧急性 (0~1)：敌人越近越高 ----
             var urgency = Math.max(0, Math.min(1, (MAX_RANGE - bestD) / MAX_RANGE));
 
-            // ---- 接近速度（正 = 敌人逼近） ----
             var closingSpeed = 0;
             if (mt && mt.prevDist !== undefined && mt.prevEnemyHash === bestH) {
                 closingSpeed = (mt.prevDist - bestD) / TICK_GAP;
             }
-            // 相对速度投影（更灵敏）
             var relVx = bvx - mvx;
             var relVy = bvy - mvy;
             var toMechX = mx - best.field_4227;
@@ -156,14 +138,11 @@ function onTick(tick) {
             mt.prevDist = bestD;
             mt.prevEnemyHash = bestH;
 
-            // ---- 预判 lookahead ticks ----
             var lookahead = LOOKAHEAD_BASE + urgency * Math.max(0, closingSpeed) * LOOKAHEAD_SPEED;
 
-            // ---- 预测敌人 N tick 后位置 ----
             var predX = best.field_4227 + bvx * lookahead;
             var predY = best.field_4228 + bvy * lookahead;
 
-            // ---- 影子行为：维持在 MAX_RANGE 距离 ----
             var dx = mx - predX;
             var dy = my - predY;
             var dd = Math.sqrt(dx * dx + dy * dy);
@@ -178,16 +157,8 @@ function onTick(tick) {
             var act = game.field_6412.method_2058(m.field_1927);
             act.method_2139(m);
             act.method_2134(tx, ty);
-            moveCount++;
         }
-    } catch (e) {
-        if (errCount < 3) {
-            errCount++;
-            show("ERR:" + e);
-        }
-    }
+    } catch (e) {}
 }
 
-function init() {
-    show("v7-shadow-predict loaded");
-}
+function init() {}
