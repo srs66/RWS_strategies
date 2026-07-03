@@ -4,7 +4,7 @@ var UC = Packages.com.corrodinggames.rts.strategy.game.units.class_426;
 
 var UNIT_NAME = "mechArtillery";
 var MAX_RANGE = 290;
-var TICK_GAP = 3;
+var TICK_GAP = 5;
 var ENGAGE_MARGIN = 8;
 var SHADOW_TOLERANCE = 0;
 var LOOKAHEAD_BASE = 55;
