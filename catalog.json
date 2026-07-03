@@ -1,16 +1,42 @@
 {
-  "repo_version": 1,
+  "repo_version": "v1.8",
   "base_url": "https://raw.githubusercontent.com/srs66/RWS_strategies/main/scripts",
   "announcement": {
     "enabled": true,
-    "title": "策略版 v1.6 更新",
+    "title": "策略版开发者公告",
     "message": "新增策略商店功能！\n\n1. 点击主界面「策略商店」按钮\n2. 浏览并下载官方策略\n3. 自动导入，开箱即用\n\n更多策略持续更新中...\n\nQQ群：957239859",
-    "actionText": "查看详情",
-    "actionUrl": "https://example.com/announcement",
-    "force_update": true,
-    "force_exit": false,
-    "min_app_version": "v1.3",
-    "update_url": "https://example.com/latest.apk"
+    "actionText_1": "",
+    "actionUrl_1": "",
+    "copyText_1": "",
+    "actionText_2": "我知道了",
+    "actionUrl_2": "",
+    "copyText_2": "",
+    "app_version": ["v1.6", "v1.7", "v1.8"]
+  },
+  "updateNotification": {
+    "enabled": false,
+    "title": "策略版 v1.8 更新",
+    "message": "修复了一些已知的问题\n\n更多策略持续更新中...\n\nQQ群：957239859",
+    "actionText_1": "查看详情",
+    "actionUrl_1": "https://example1.com",
+    "copyText_1": "957239859",
+    "actionText_2": "我知道了",
+    "actionUrl_2": "https://example2.com",
+    "copyText_2": "",
+    "app_version": ["v1.6", "v1.7"]
+  },
+  "forceUpdate": {
+    "enabled": false,
+    "title": "策略版 v1.8 更新",
+    "message": "修复了一些已知的问题\n\n更多策略持续更新中...\n\nQQ群：957239859\n\n点击按钮自动复制QQ群号，请前往下载最新版本。",
+    "actionText_1": "立即更新",
+    "actionUrl_1": "https://example1.com",
+    "copyText_1": "957239859",
+    "app_version": ["v1.4", "v1.5"]
+  },
+  "deactivatedVersion": {
+    "enabled": false,
+    "version": ["v1.0", "v1.2", "v1.3"]
   },
   "strategies": [
     {
@@ -19,15 +45,15 @@
       "version": "1.0.0",
       "description": "影子级响应 + 预判走位的机枪机甲微操脚本。\n\n功能：\n- 自动计算最佳射程保持安全距离\n- 预判敌人移动轨迹\n- 支持逐机甲独立决策\n- tick级响应速度\n\n适合对战中使用机枪机甲进行风筝牵制。",
       "filename": "mech_kiting.js",
-      "tags": ["战斗", "微操", "机甲"]
+      "tags": ["单位规则", "单挑猛犸", "全自动微操"]
     },
     {
       "title": "自动建造策略",
       "author": "策略版官方",
-      "version": "2.2.0",
+      "version": "1.0.0",
       "description": "自动管理建造单位和经济生产...",
       "filename": "auto_builder.js",
-      "tags": ["经济", "建造"]
+      "tags": ["标准开局策略", "经济", "建造", "自动化开局"]
     }
   ]
 }
