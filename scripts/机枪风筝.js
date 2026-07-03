@@ -4,10 +4,10 @@ var UC = Packages.com.corrodinggames.rts.strategy.game.units.class_426;
 
 var UNIT_NAME = "mechMinigun";
 var MAX_RANGE = 210;
-var TICK_GAP = 2;
-var ENGAGE_MARGIN = 6;
+var TICK_GAP = 3;
+var ENGAGE_MARGIN = 3;
 var SHADOW_TOLERANCE = 0;
-var LOOKAHEAD_BASE = 600;
+var LOOKAHEAD_BASE = 35;
 var LOOKAHEAD_SPEED = 20;
 
 var track = {};
@@ -23,6 +23,23 @@ function unitName(u) {
 
 function unitHash(u) {
     try { return u.hashCode(); } catch (e) { return 0; }
+}
+
+// 判断是否为有效敌方单位（排除中立/Gaia单位，如树木、资源点等）
+function isValidEnemy(u, myTeam) {
+    try {
+        var p = u.field_1927;
+        if (!p) return false;
+        var team = p.field_1464;
+        // 排除己方队伍
+        if (team === myTeam) return false;
+        // 排除Gaia/中立队伍（树木、资源点、地图装饰等）
+        // Gaia队伍ID通常为 -1
+        if (team < 0) return false;
+        return true;
+    } catch (e) {
+        return false;
+    }
 }
 
 var n = 0;
@@ -50,7 +67,7 @@ function onTick(tick) {
             if (!p) continue;
             if (p.field_1464 === myTeam && unitName(u) === UNIT_NAME) {
                 mechs.push(u);
-            } else if (p.field_1464 !== myTeam) {
+            } else if (isValidEnemy(u, myTeam)) {
                 enemies.push(u);
             }
         }
