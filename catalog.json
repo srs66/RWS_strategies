@@ -7,7 +7,7 @@
     "message": "新增策略商店功能！\n\n1. 点击主界面「策略商店」按钮\n2. 浏览并下载官方策略\n3. 自动导入，开箱即用\n\n更多策略持续更新中...\n\nQQ群：957239859",
     "actionText": "查看详情",
     "actionUrl": "https://example.com/announcement",
-    "force_update": false,
+    "force_update": true,
     "force_exit": false,
     "min_app_version": "v1.3",
     "update_url": "https://example.com/latest.apk"
@@ -24,7 +24,7 @@
     {
       "title": "自动建造策略",
       "author": "策略版官方",
-      "version": "1.0.0",
+      "version": "1.2.0",
       "description": "自动管理建造单位和经济生产...",
       "filename": "auto_builder.js",
       "tags": ["经济", "建造"]
@@ -32,7 +32,7 @@
     {
       "title": "自动建造策略",
       "author": "策略版官方",
-      "version": "1.0.0",
+      "version": "1.3.0",
       "description": "自动管理建造单位和经济生产...",
       "filename": "auto_builder.js",
       "tags": ["经济", "建造"]
@@ -40,7 +40,7 @@
     {
       "title": "自动建造策略",
       "author": "策略版官方",
-      "version": "1.0.0",
+      "version": "1.4.0",
       "description": "自动管理建造单位和经济生产...",
       "filename": "auto_builder.js",
       "tags": ["经济", "建造"]
@@ -48,7 +48,7 @@
     {
       "title": "自动建造策略",
       "author": "策略版官方",
-      "version": "1.0.0",
+      "version": "1.5.0",
       "description": "自动管理建造单位和经济生产...",
       "filename": "auto_builder.js",
       "tags": ["经济", "建造"]
@@ -56,7 +56,7 @@
     {
       "title": "自动建造策略",
       "author": "策略版官方",
-      "version": "1.0.0",
+      "version": "1.6.0",
       "description": "自动管理建造单位和经济生产...",
       "filename": "auto_builder.js",
       "tags": ["经济", "建造"]
@@ -64,7 +64,7 @@
     {
       "title": "自动建造策略",
       "author": "策略版官方",
-      "version": "1.0.0",
+      "version": "1.7.0",
       "description": "自动管理建造单位和经济生产...",
       "filename": "auto_builder.js",
       "tags": ["经济", "建造"]
@@ -72,7 +72,7 @@
     {
       "title": "自动建造策略",
       "author": "策略版官方",
-      "version": "1.0.0",
+      "version": "1.8.0",
       "description": "自动管理建造单位和经济生产...",
       "filename": "auto_builder.js",
       "tags": ["经济", "建造"]
@@ -80,7 +80,7 @@
     {
       "title": "自动建造策略",
       "author": "策略版官方",
-      "version": "1.0.0",
+      "version": "1.9.0",
       "description": "自动管理建造单位和经济生产...",
       "filename": "auto_builder.js",
       "tags": ["经济", "建造"]
