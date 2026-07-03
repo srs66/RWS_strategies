@@ -2,7 +2,7 @@
   "repo_version": 1,
   "base_url": "https://raw.githubusercontent.com/srs66/RWS_strategies/main/scripts",
   "announcement": {
-    "enabled": false,
+    "enabled": true,
     "title": "策略版 v1.6 更新",
     "message": "新增策略商店功能！\n\n1. 点击主界面「策略商店」按钮\n2. 浏览并下载官方策略\n3. 自动导入，开箱即用\n\n更多策略持续更新中...\n\nQQ群：957239859",
     "actionText": "查看详情",
