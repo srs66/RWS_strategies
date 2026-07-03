@@ -167,10 +167,29 @@ function onTick(tick) {
             if (dd < 1) dd = 1;
 
             var r = (MAX_RANGE - ENGAGE_MARGIN) / dd;
-            var tx = predX + dx * r;
-            var ty = predY + dy * r;
+            var idealTx = predX + dx * r;
+            var idealTy = predY + dy * r;
 
-            if (dist(ux, uy, tx, ty) < SHADOW_TOLERANCE) continue;
+            // 到目标点的偏移量和距离
+            var tdx = idealTx - ux;
+            var tdy = idealTy - uy;
+            var tdist = Math.sqrt(tdx * tdx + tdy * tdy);
+
+            if (tdist < SHADOW_TOLERANCE) continue;
+
+            // 自行火炮倒车逻辑：当需要后撤时（敌人进入射程内），只允许短距离后退，
+            // 保持炮口始终向敌，实现缓慢倒车而非转身逃跑
+            var isRetreat = dd < (MAX_RANGE - ENGAGE_MARGIN);
+            var MAX_BACKSTEP = 5;
+
+            var tx, ty;
+            if (isRetreat && tdist > MAX_BACKSTEP) {
+                tx = ux + (tdx / tdist) * MAX_BACKSTEP;
+                ty = uy + (tdy / tdist) * MAX_BACKSTEP;
+            } else {
+                tx = idealTx;
+                ty = idealTy;
+            }
 
             var act = game.field_6412.method_2058(u.field_1927);
             act.method_2139(u);
