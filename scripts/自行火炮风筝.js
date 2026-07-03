@@ -12,8 +12,8 @@ var LOOKAHEAD_SPEED = 32;
 
 // 停止-开火 节奏控制（shootDelay=240帧）
 // 持续移动会导致 isFixedFiring 单位无法开火，需要在后退间隙停顿
-var HOLD_DURATION = 200;   // 停顿等开火的帧数
-var RETREAT_DURATION = 450; // 后撤等冷却的帧数（≈shootDelay - 开火耗时）
+var HOLD_DURATION = 800;   // 停顿等开火的帧数
+var RETREAT_DURATION = 2800; // 后撤等冷却的帧数（≈shootDelay - 开火耗时）
 
 var track = {};
 
@@ -213,7 +213,7 @@ function onTick(tick) {
                 }
 
                 // 后撤阶段：短距离倒车，炮口向敌
-                var MAX_BACKSTEP = 20;
+                var MAX_BACKSTEP = 50;
                 var tx = ux + (tdx / tdist) * MAX_BACKSTEP;
                 var ty = uy + (tdy / tdist) * MAX_BACKSTEP;
             } else {
