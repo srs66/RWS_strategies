@@ -11,7 +11,7 @@
     "actionText_2": "我知道了",
     "actionUrl_2": "",
     "copyText_2": "",
-    "app_version": ["v1.6", "v1.7", "v1.8"]
+    "app_version": ["v1.0", "v1.7", "v1.8"]
   },
   "updateNotification": {
     "enabled": false,
