@@ -5,9 +5,9 @@ var UC = Packages.com.corrodinggames.rts.strategy.game.units.class_426;
 var UNIT_NAME = "mechMinigun";
 var MAX_RANGE = 210;
 var TICK_GAP = 3;
-var ENGAGE_MARGIN = 3;
+var ENGAGE_MARGIN = 6;
 var SHADOW_TOLERANCE = 0;
-var LOOKAHEAD_BASE = 35;
+var LOOKAHEAD_BASE = 600;
 var LOOKAHEAD_SPEED = 20;
 
 var track = {};
