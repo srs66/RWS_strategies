@@ -4,7 +4,7 @@ var UC = Packages.com.corrodinggames.rts.strategy.game.units.class_426;
 
 var UNIT_NAME = "mechLaser";
 var MAX_RANGE = 310;
-var TICK_GAP = 1;
+var TICK_GAP = 5;
 var ENGAGE_MARGIN = 5;
 var SHADOW_TOLERANCE = 0;
 var LOOKAHEAD_BASE = 40;
