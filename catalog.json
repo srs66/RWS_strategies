@@ -35,7 +35,7 @@
     "app_version": ["v1.4", "v1.5"]
   },
   "deactivatedVersion": {
-    "enabled": false,
+    "enabled": true,
     "version": ["v1.0", "v1.2", "v1.3"]
   },
   "strategies": [
