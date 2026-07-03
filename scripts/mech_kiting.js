@@ -7,7 +7,7 @@ var MAX_RANGE = 210;
 var TICK_GAP = 1;
 var ENGAGE_MARGIN = 1;
 var SHADOW_TOLERANCE = 0;
-var LOOKAHEAD_BASE = 35;
+var LOOKAHEAD_BASE = 600;
 var LOOKAHEAD_SPEED = 20;
 
 var track = {};
