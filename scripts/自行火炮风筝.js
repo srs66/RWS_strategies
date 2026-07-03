@@ -10,6 +10,11 @@ var SHADOW_TOLERANCE = 0;
 var LOOKAHEAD_BASE = 65;
 var LOOKAHEAD_SPEED = 32;
 
+// 停止-开火 节奏控制（shootDelay=240帧）
+// 持续移动会导致 isFixedFiring 单位无法开火，需要在后退间隙停顿
+var HOLD_DURATION = 80;    // 停顿等开火的帧数
+var RETREAT_DURATION = 180; // 后撤等冷却的帧数（≈shootDelay - 开火耗时）
+
 var track = {};
 
 function dist(ax, ay, bx, by) {
@@ -170,25 +175,51 @@ function onTick(tick) {
             var idealTx = predX + dx * r;
             var idealTy = predY + dy * r;
 
-            // 到目标点的偏移量和距离
             var tdx = idealTx - ux;
             var tdy = idealTy - uy;
             var tdist = Math.sqrt(tdx * tdx + tdy * tdy);
 
             if (tdist < SHADOW_TOLERANCE) continue;
 
-            // 自行火炮倒车逻辑：当需要后撤时（敌人进入射程内），只允许短距离后退，
-            // 保持炮口始终向敌，实现缓慢倒车而非转身逃跑
+            // 判断是否需要后撤（敌人已进入射程内）
             var isRetreat = dd < (MAX_RANGE - ENGAGE_MARGIN);
-            var MAX_BACKSTEP = 5;
 
-            var tx, ty;
-            if (isRetreat && tdist > MAX_BACKSTEP) {
-                tx = ux + (tdx / tdist) * MAX_BACKSTEP;
-                ty = uy + (tdy / tdist) * MAX_BACKSTEP;
+            if (isRetreat) {
+                // ============================================================
+                // 停止-开火 节奏：自行火炮 isFixedFiring=true，移动时不会开火
+                // 节奏：停顿 HOLD → 开火 → 后撤 RETREAT（等冷却）→ 停顿 HOLD → ...
+                // shootDelay=240帧，HOLD=80帧（瞄准+开火），RETREAT=180帧（冷却期后撤）
+                // ============================================================
+                if (!ut.phase) { ut.phase = "hold"; ut.phaseTick = tick; }
+
+                if (ut.phase === "hold") {
+                    if (tick - ut.phaseTick >= HOLD_DURATION) {
+                        // 停顿结束，切换到后撤阶段
+                        ut.phase = "retreat";
+                        ut.phaseTick = tick;
+                    } else {
+                        // 还在停顿等开火，不发送移动指令
+                        continue;
+                    }
+                }
+
+                if (ut.phase === "retreat") {
+                    if (tick - ut.phaseTick >= RETREAT_DURATION) {
+                        // 后撤结束，切换到停顿阶段等下一炮
+                        ut.phase = "hold";
+                        ut.phaseTick = tick;
+                        continue; // 本帧不移动，开始停顿
+                    }
+                }
+
+                // 后撤阶段：短距离倒车，炮口向敌
+                var MAX_BACKSTEP = 20;
+                var tx = ux + (tdx / tdist) * MAX_BACKSTEP;
+                var ty = uy + (tdy / tdist) * MAX_BACKSTEP;
             } else {
-                tx = idealTx;
-                ty = idealTy;
+                // 敌人尚远，正常前压，不做节奏限制
+                var tx = idealTx;
+                var ty = idealTy;
             }
 
             var act = game.field_6412.method_2058(u.field_1927);
