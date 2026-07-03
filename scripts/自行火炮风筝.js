@@ -4,7 +4,7 @@ var UC = Packages.com.corrodinggames.rts.strategy.game.units.class_426;
 
 var UNIT_NAME = "c_artillery";
 var MAX_RANGE = 290;
-var TICK_GAP = 5;
+var TICK_GAP = 50;
 var ENGAGE_MARGIN = 10;
 var SHADOW_TOLERANCE = 0;
 var LOOKAHEAD_BASE = 65;
@@ -12,8 +12,8 @@ var LOOKAHEAD_SPEED = 32;
 
 // 停止-开火 节奏控制（shootDelay=240帧）
 // 持续移动会导致 isFixedFiring 单位无法开火，需要在后退间隙停顿
-var HOLD_DURATION = 80;    // 停顿等开火的帧数
-var RETREAT_DURATION = 180; // 后撤等冷却的帧数（≈shootDelay - 开火耗时）
+var HOLD_DURATION = 200;   // 停顿等开火的帧数
+var RETREAT_DURATION = 450; // 后撤等冷却的帧数（≈shootDelay - 开火耗时）
 
 var track = {};
 
