@@ -1,6 +1,8 @@
 // ============================================================
 // 重型拦截机高级AI指挥系统 — 原版JS适配版
-// 转化自rwmod战术系统，支持：集结/冲锋、引火检测、左右绕侧、残血撤退、方向平衡
+// 修复：两侧敌人时只规避最近敌人，避免被包围
+// 修复：删除集结/队友跟随逻辑
+// 受击时绕圈移动（沿切线方向），不中断攻击
 // 距离限制：只锁定800码以内的敌方目标
 // ============================================================
 
@@ -8,41 +10,34 @@ var GH = Packages.cn.tesseract.union.util.GameHelper;
 var UC = Packages.com.corrodinggames.rts.strategy.game.units.class_426;
 
 // ========== 全局配置 ==========
-var TICK_GAP = 6;           // 每6tick执行一次（约0.1秒）
-var MAX_RANGE = 170;        // 攻击范围
-var ENGAGE_RANGE = 110;     // 接敌距离
-var RETREAT_SHIELD = 150;   // 残血护盾阈值
-var FULL_SHIELD = 150;      // 满血护盾阈值（用于判断已回复）
-
-// 距离限制
-var TARGET_LOCK_RANGE = 800; // 只锁定800码以内的敌方目标
-
-// 集结参数
-var RALLY_NEAR = 250;       // 集结近距离
-var RALLY_FAR = 500;        // 集结远距离
-var CHARGE_SPEED = 2.75;    // 冲锋速度（通过移动频率模拟）
-var NORMAL_SPEED = 2.0;     // 正常速度
+var TICK_GAP = 6;
+var MAX_RANGE = 170;
+var ENGAGE_RANGE = 110;
+var RETREAT_SHIELD = 150;
+var FULL_SHIELD = 150;
+var TARGET_LOCK_RANGE = 800;
 
 // 绕侧参数
-var FLANK_OFFSET_NEAR = 100;   // 近距离绕侧偏移
-var FLANK_OFFSET_FAR = 160;    // 远距离绕侧偏移
-var FLANK_OFFSET_CHASE = 115;  // 追击绕侧偏移
-var FLANK_OFFSET_MID = 60;     // 中圈绕侧偏移
-var FLANK_OFFSET_LARGE = 50;   // 大圈绕侧偏移
-var FLANK_RETREAT_OFFSET = 155;// 追击绕侧偏移（撤退后）
+var FLANK_OFFSET_NEAR = 100;
+var FLANK_OFFSET_FAR = 160;
+var FLANK_OFFSET_CHASE = 115;
+var FLANK_OFFSET_MID = 60;
+var FLANK_OFFSET_LARGE = 50;
 
 // 距离参数
-var ENEMY_DETECT = 170;       // 敌方检测距离
-var ENEMY_FAR = 500;        // 敌方远距离检测
-var ENEMY_VERY_FAR = 600;   // 敌方超远距离
-var COMMAND_RANGE = 470;    // 指挥系统范围
-var RETURN_RANGE = 170;       // 返回范围
-var TOO_FAR_RANGE = 800;    // 过远距离
+var ENEMY_DETECT = 170;
+var ENEMY_FAR = 500;
+var COMMAND_RANGE = 470;
+var RETURN_RANGE = 170;
 
 // 战术参数
-var FIRE_BAIT_RATIO = 0.5;  // 引火判定比例
-var AMMO_MAX = 8;           // 弹药上限（模拟）
-var TACTIC_COOLDOWN = 25;   // 战术切换冷却（tick）
+var FIRE_BAIT_RATIO = 0.5;
+var AMMO_MAX = 8;
+var TACTIC_COOLDOWN = 25;
+
+// 绕圈参数
+var ORBIT_SPEED = 60;       // 绕圈移动距离（每tick）
+var ORBIT_DURATION = 40;    // 绕圈持续时间（tick，约4秒）
 
 // ========== 单位状态存储 ==========
 var unitStates = {};
@@ -58,11 +53,13 @@ function getState(u) {
             retreatTimer: 0,
             tacticCooldown: 0,
             tacticSwitch: 0,
-            isCharging: false,
             preventFar: 0,
             lastHp: -1,
             timeAlive: 0,
-            isGrouped: false
+            isGrouped: false,
+            isOrbiting: false,      // 是否正在绕圈
+            orbitTimer: 0,          // 绕圈计时器
+            orbitDirection: 1       // 绕圈方向：1=顺时针，-1=逆时针
         };
     }
     return unitStates[h];
@@ -163,23 +160,6 @@ function getEnemyAirUnits(units, myTeam) {
     return list;
 }
 
-function distToNearest(x, y, units) {
-    var minD = Infinity;
-    for (var i = 0; i < units.length; i++) {
-        var d = dist(x, y, getX(units[i]), getY(units[i]));
-        if (d < minD) minD = d;
-    }
-    return minD;
-}
-
-function countFriendlyInRange(x, y, units, range) {
-    var count = 0;
-    for (var i = 0; i < units.length; i++) {
-        if (dist(x, y, getX(units[i]), getY(units[i])) <= range) count++;
-    }
-    return count;
-}
-
 function countEnemyInRange(x, y, enemies, range) {
     var count = 0;
     for (var i = 0; i < enemies.length; i++) {
@@ -197,15 +177,6 @@ function findNearestEnemy(x, y, enemies) {
     return { unit: nearest, dist: minD };
 }
 
-function findNearestFriendly(x, y, units) {
-    var nearest = null, minD = Infinity;
-    for (var i = 0; i < units.length; i++) {
-        var d = dist(x, y, getX(units[i]), getY(units[i]));
-        if (d < minD) { minD = d; nearest = units[i]; }
-    }
-    return { unit: nearest, dist: minD };
-}
-
 function calcEnemyCenter(enemies) {
     var cx = 0, cy = 0;
     for (var i = 0; i < enemies.length; i++) {
@@ -213,15 +184,6 @@ function calcEnemyCenter(enemies) {
         cy += getY(enemies[i]);
     }
     return { x: cx / enemies.length, y: cy / enemies.length };
-}
-
-function calcFriendlyCenter(units) {
-    var cx = 0, cy = 0;
-    for (var i = 0; i < units.length; i++) {
-        cx += getX(units[i]);
-        cy += getY(units[i]);
-    }
-    return { x: cx / units.length, y: cy / units.length };
 }
 
 function getPerpendicular(dx, dy, isLeft) {
@@ -266,6 +228,45 @@ function calcReturnPoint(ux, uy, cx, cy, distance) {
     };
 }
 
+// 计算绕圈目标点（沿切线方向移动，保持距离不变）
+function calcOrbitPoint(ex, ey, ux, uy, orbitDir, speed) {
+    var dx = ux - ex;
+    var dy = uy - ey;
+    var len = Math.sqrt(dx * dx + dy * dy);
+    if (len < 1) len = 1;
+
+    // 当前距离敌人的距离
+    var curDist = len;
+
+    // 切线方向（垂直于敌人->我的向量）
+    // orbitDir: 1 = 顺时针, -1 = 逆时针
+    var tangentX = orbitDir * (dy / len);
+    var tangentY = orbitDir * (-dx / len);
+
+    // 沿切线移动，同时微调保持距离
+    var targetX = ux + tangentX * speed;
+    var targetY = uy + tangentY * speed;
+
+    // 确保保持距离在攻击范围内
+    var newDx = targetX - ex;
+    var newDy = targetY - ey;
+    var newLen = Math.sqrt(newDx * newDx + newDy * newDy);
+    if (newLen > 0) {
+        // 如果距离变化太大，调整回合理范围
+        if (newLen > MAX_RANGE) {
+            var scale = MAX_RANGE / newLen;
+            targetX = ex + newDx * scale;
+            targetY = ey + newDy * scale;
+        } else if (newLen < 100) {
+            var scale = 100 / newLen;
+            targetX = ex + newDx * scale;
+            targetY = ey + newDy * scale;
+        }
+    }
+
+    return { x: targetX, y: targetY };
+}
+
 // ========== 主循环 ==========
 var tickCounter = 0;
 
@@ -283,16 +284,14 @@ function onTick(tick) {
         if (!ul) return;
         var sz = ul.size();
 
-        // 收集所有单位
+        // 只收集我方重拦截和敌方单位
         var myInterceptors = [];
         var enemyInterceptors = [];
         var enemyAirUnits = [];
-        var allUnits = [];
 
         for (var i = 0; i < sz; i++) {
             var u = ul.get(i);
             if (!u || u.field_1925 || u.field_4222) continue;
-            allUnits.push(u);
 
             if (isMyInterceptor(u, myTeam)) {
                 myInterceptors.push(u);
@@ -305,66 +304,59 @@ function onTick(tick) {
 
         if (myInterceptors.length === 0) return;
 
-        // 计算我方中心点（用于距离限制判断）
-        var myCenter = calcFriendlyCenter(myInterceptors);
+        // 计算我方中心点（仅用于距离限制）
+        var myCenterX = 0, myCenterY = 0;
+        for (var i = 0; i < myInterceptors.length; i++) {
+            myCenterX += getX(myInterceptors[i]);
+            myCenterY += getY(myInterceptors[i]);
+        }
+        myCenterX /= myInterceptors.length;
+        myCenterY /= myInterceptors.length;
 
         // 过滤敌方目标：只保留800码以内的
         var allEnemies = [];
+        var enemyHeavyInRange = [];
 
-        // 先收集所有敌方重型拦截机
         for (var i = 0; i < enemyInterceptors.length; i++) {
-            var dToMyCenter = dist(myCenter.x, myCenter.y, getX(enemyInterceptors[i]), getY(enemyInterceptors[i]));
+            var dToMyCenter = dist(myCenterX, myCenterY, getX(enemyInterceptors[i]), getY(enemyInterceptors[i]));
             if (dToMyCenter <= TARGET_LOCK_RANGE) {
                 allEnemies.push(enemyInterceptors[i]);
+                enemyHeavyInRange.push(enemyInterceptors[i]);
             }
         }
 
-        // 再收集其他空中单位（同样限制800码）
         for (var i = 0; i < enemyAirUnits.length; i++) {
-            var dToMyCenter = dist(myCenter.x, myCenter.y, getX(enemyAirUnits[i]), getY(enemyAirUnits[i]));
+            var dToMyCenter = dist(myCenterX, myCenterY, getX(enemyAirUnits[i]), getY(enemyAirUnits[i]));
             if (dToMyCenter <= TARGET_LOCK_RANGE) {
                 allEnemies.push(enemyAirUnits[i]);
             }
         }
 
-        // 如果800码内没有敌人，返回集结点或巡逻
+        // 800码内没有敌人，不执行任何移动指令
         if (allEnemies.length === 0) {
-            handleNoEnemies(myInterceptors, game, myCenter);
             return;
         }
 
-        // 计算集结中心
-        var rallyCenter = calcFriendlyCenter(myInterceptors);
-
-        // 计算敌方中心（只基于800码内的敌人）
+        // 计算敌方中心
         var enemyCenter = calcEnemyCenter(allEnemies);
 
-        // 集结检测
-        var nearCount = countFriendlyInRange(rallyCenter.x, rallyCenter.y, myInterceptors, RALLY_NEAR);
-        var farCount = countFriendlyInRange(rallyCenter.x, rallyCenter.y, myInterceptors, RALLY_FAR);
-        var isFullyGrouped = (nearCount === farCount && farCount > 0);
-
-        // 引火检测（只基于800码内的敌方重型拦截机）
+        // 引火检测（只基于我方重拦截与敌方距离）
         var fireBaitCount = 0;
-        var enemyHeavyInRange = [];
-        for (var i = 0; i < enemyInterceptors.length; i++) {
-            var dToMyCenter = dist(myCenter.x, myCenter.y, getX(enemyInterceptors[i]), getY(enemyInterceptors[i]));
-            if (dToMyCenter <= TARGET_LOCK_RANGE) {
-                enemyHeavyInRange.push(enemyInterceptors[i]);
-            }
-        }
-
         for (var i = 0; i < enemyHeavyInRange.length; i++) {
             var ex = getX(enemyHeavyInRange[i]);
             var ey = getY(enemyHeavyInRange[i]);
-            var dToMy = distToNearest(ex, ey, myInterceptors);
+            var dToMy = Infinity;
+            for (var j = 0; j < myInterceptors.length; j++) {
+                var d = dist(ex, ey, getX(myInterceptors[j]), getY(myInterceptors[j]));
+                if (d < dToMy) dToMy = d;
+            }
             if (dToMy > 170 && dToMy < 250) {
                 fireBaitCount++;
             }
         }
         var isFireBaiting = (enemyHeavyInRange.length > 0 && fireBaitCount >= enemyHeavyInRange.length * 0.4);
 
-        // 方向平衡
+        // 方向平衡（只在我方重拦截之间）
         var leftCount = 0, rightCount = 0;
         for (var i = 0; i < myInterceptors.length; i++) {
             var state = getState(myInterceptors[i]);
@@ -372,7 +364,6 @@ function onTick(tick) {
             else rightCount++;
         }
 
-        // 为未分组单位分配方向
         for (var i = 0; i < myInterceptors.length; i++) {
             var state = getState(myInterceptors[i]);
             if (!state.isGrouped) {
@@ -387,10 +378,10 @@ function onTick(tick) {
             }
         }
 
-        // 动态方向平衡调整
+        // 动态方向平衡
         for (var i = 0; i < myInterceptors.length; i++) {
             var state = getState(myInterceptors[i]);
-            if (state.isRetreating || state.preventFar > 0) continue;
+            if (state.isRetreating || state.preventFar > 0 || state.isOrbiting) continue;
 
             if (leftCount > rightCount + 1 && state.direction === "left" && Math.random() < 0.3) {
                 state.direction = "right";
@@ -402,7 +393,7 @@ function onTick(tick) {
             }
         }
 
-        // ========== 逐个单位处理 ==========
+        // ========== 逐个单位独立处理（完全无视队友） ==========
         for (var i = 0; i < myInterceptors.length; i++) {
             var u = myInterceptors[i];
             var state = getState(u);
@@ -410,32 +401,80 @@ function onTick(tick) {
             var shield = getShield(u);
             var isLeft = (state.direction === "left");
 
-            // 更新状态
+            // 更新状态计时器
             state.timeAlive++;
             if (state.tacticCooldown > 0) state.tacticCooldown--;
             if (state.retreatTimer > 0) state.retreatTimer--;
             if (state.preventFar > 0) state.preventFar--;
+            if (state.orbitTimer > 0) state.orbitTimer--;
 
             // 检测受击
             var curHp = shield;
+            var wasHit = false;
             if (state.lastHp > 0 && curHp < state.lastHp) {
                 state.ammo = Math.min(state.ammo + 1, AMMO_MAX);
+                state.lastHitTime = state.timeAlive;
+                wasHit = true;
             }
             state.lastHp = curHp;
 
-            // 残血检测
+            // 找最近的敌人
+            var nearest = findNearestEnemy(ux, uy, allEnemies);
+            var nearestEnemy = nearest.unit;
+            var nearestDist = nearest.dist;
+
+            if (!nearestEnemy) {
+                continue;
+            }
+
+            var ex = getX(nearestEnemy), ey = getY(nearestEnemy);
+
+            // ========== 核心：受击时绕圈移动 ==========
+            if (wasHit && !state.isRetreating) {
+                state.isOrbiting = true;
+                state.orbitTimer = ORBIT_DURATION;
+                // 随机选择绕圈方向（与单位方向一致）
+                state.orbitDirection = isLeft ? -1 : 1;
+            }
+
+            if (state.isOrbiting && state.orbitTimer > 0) {
+                // 沿切线方向绕圈移动，保持距离不变
+                var orbitPt = calcOrbitPoint(ex, ey, ux, uy, state.orbitDirection, ORBIT_SPEED);
+                moveUnit(u, orbitPt.x, orbitPt.y, game);
+
+                // 绕圈结束
+                if (state.orbitTimer <= 0) {
+                    state.isOrbiting = false;
+                }
+                continue;
+            }
+
+            // ========== 残血撤退（只远离最近敌人） ==========
             var isLowHp = (shield < RETREAT_SHIELD);
             var isFullHp = (shield >= FULL_SHIELD);
 
             if (isLowHp && state.retreatTimer === 0) {
                 state.isRetreating = true;
                 state.retreatTimer = 70;
+                state.isOrbiting = false;
             }
             if (isFullHp && state.retreatTimer === 0) {
                 state.isRetreating = false;
             }
 
-            // 战术切换逻辑
+            if (state.isRetreating && state.retreatTimer > 0) {
+                var retreatPt = calcRetreatPoint(ux, uy, ex, ey, 400);
+                moveUnit(u, retreatPt.x, retreatPt.y, game);
+
+                if (state.retreatTimer <= 1) {
+                    state.direction = isLeft ? "right" : "left";
+                    state.ammo = 0;
+                    state.isRetreating = false;
+                }
+                continue;
+            }
+
+            // ========== 战术切换 ==========
             if (state.tacticCooldown <= 0) {
                 if (isFireBaiting && state.tactic !== "拉扯") {
                     state.tactic = "拉扯";
@@ -450,7 +489,7 @@ function onTick(tick) {
                 state.tacticSwitch += 0.1;
             }
 
-            // 死斗模式
+            // 死斗模式（只看我方重拦截）
             var hasDeadFightNearby = false;
             for (var j = 0; j < myInterceptors.length; j++) {
                 if (myInterceptors[j] !== u) {
@@ -469,77 +508,21 @@ function onTick(tick) {
                 state.tactic = "缠斗";
             }
 
-            // 找最近的敌人（只会在800码内的敌人中找）
-            var nearest = findNearestEnemy(ux, uy, allEnemies);
-            var nearestEnemy = nearest.unit;
-            var nearestDist = nearest.dist;
-
-            if (!nearestEnemy) {
-                // 800码内没有敌人，返回集结点
-                var retPoint = calcReturnPoint(ux, uy, rallyCenter.x, rallyCenter.y, 200);
-                moveUnit(u, retPoint.x, retPoint.y, game);
-                continue;
-            }
-
-            var ex = getX(nearestEnemy), ey = getY(nearestEnemy);
-
-            // ========== 距离过远，返回指挥地点 ==========
-            var distToRally = dist(ux, uy, rallyCenter.x, rallyCenter.y);
-            if (distToRally > COMMAND_RANGE && !state.isRetreating) {
+            // ========== 距离过远返回（返回敌方中心方向） ==========
+            var distToEnemyCenter = dist(ux, uy, enemyCenter.x, enemyCenter.y);
+            if (distToEnemyCenter > COMMAND_RANGE && !state.isRetreating) {
                 state.preventFar = 3;
             }
             if (state.preventFar > 0) {
-                var returnPt = calcReturnPoint(ux, uy, rallyCenter.x, rallyCenter.y, 300);
+                var returnPt = calcReturnPoint(ux, uy, enemyCenter.x, enemyCenter.y, 300);
                 moveUnit(u, returnPt.x, returnPt.y, game);
-                if (distToRally < RETURN_RANGE) {
+                if (distToEnemyCenter < RETURN_RANGE) {
                     state.preventFar = 0;
                 }
                 continue;
             }
 
-            // ========== 残血撤退逻辑 ==========
-            if (state.isRetreating && state.retreatTimer > 0) {
-                var retreatPt = calcRetreatPoint(ux, uy, ex, ey, 400);
-
-                if (isLeft) {
-                    retreatPt.x -= 400;
-                } else {
-                    retreatPt.x += 400;
-                }
-
-                moveUnit(u, retreatPt.x, retreatPt.y, game);
-
-                if (state.retreatTimer <= 1) {
-                    state.direction = isLeft ? "right" : "left";
-                    state.ammo = 0;
-                    state.isRetreating = false;
-                }
-                continue;
-            }
-
-            // ========== 集结/冲锋逻辑 ==========
-            if (isFullyGrouped && !state.isCharging) {
-                state.isCharging = true;
-            }
-            if (!isFullyGrouped) {
-                state.isCharging = false;
-            }
-
-            if (state.isCharging && state.tactic !== "拉扯") {
-                var chargePt = calcReturnPoint(ux, uy, enemyCenter.x, enemyCenter.y, 200);
-                moveUnit(u, chargePt.x, chargePt.y, game);
-                continue;
-            }
-
-            // 等待集结
-            var distToNearestFriend = findNearestFriendly(ux, uy, myInterceptors).dist;
-            if (!isFullyGrouped && distToNearestFriend > RALLY_NEAR && distToNearestFriend < RALLY_FAR) {
-                var gatherPt = calcReturnPoint(ux, uy, rallyCenter.x, rallyCenter.y, 100);
-                moveUnit(u, gatherPt.x, gatherPt.y, game);
-                continue;
-            }
-
-            // ========== 缠斗/死斗模式：左右绕侧 ==========
+            // ========== 缠斗/死斗：左右绕侧（只针对最近敌人） ==========
             if (state.tactic === "缠斗" || state.tactic === "死斗") {
                 var offset = FLANK_OFFSET_NEAR;
                 var enemyCountNear = countEnemyInRange(ex, ey, allEnemies, ENEMY_FAR);
@@ -589,32 +572,12 @@ function onTick(tick) {
                 continue;
             }
 
-            // 默认
-            var defaultPt = calcReturnPoint(ux, uy, rallyCenter.x, rallyCenter.y, 150);
+            // 默认：向最近敌人移动
+            var defaultPt = calcReturnPoint(ux, uy, ex, ey, 150);
             moveUnit(u, defaultPt.x, defaultPt.y, game);
         }
 
     } catch (e) {}
-}
-
-// ========== 无敌人时的处理 ==========
-function handleNoEnemies(units, game, center) {
-    if (units.length === 0) return;
-
-    var cx = center.x;
-    var cy = center.y;
-
-    for (var i = 0; i < units.length; i++) {
-        var u = units[i];
-        var state = getState(u);
-        var ux = getX(u), uy = getY(u);
-
-        var d = dist(ux, uy, cx, cy);
-        if (d > 200) {
-            var pt = calcReturnPoint(ux, uy, cx, cy, 150);
-            moveUnit(u, pt.x, pt.y, game);
-        }
-    }
 }
 
 function init() {}
